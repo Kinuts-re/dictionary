@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Мой словарь · Supabase</title>
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: #f7f9fc;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .app {
+      background: white;
+      max-width: 900px;
+      width: 100%;
+      border-radius: 32px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+      padding: 24px 28px;
+      transition: 0.2s;
+    }
+    h1, h2, h3 {
+      font-weight: 500;
+      color: #1e293b;
+    }
+    .hidden { display: none !important; }
+    .flex {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .space-between { justify-content: space-between; }
+    .gap-8 { gap: 8px; }
+    .mt-16 { margin-top: 16px; }
+    .mb-12 { margin-bottom: 12px; }
+    .text-center { text-align: center; }
+    .w-full { width: 100%; }
+
+    /* buttons */
+    .btn {
+      background: #eef2f6;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 40px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: #1e293b;
+      cursor: pointer;
+      transition: 0.15s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    .btn-primary {
+      background: #2463eb;
+      color: white;
+    }
+    .btn-primary:hover { background: #1a4fc0; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #cbd5e1;
+    }
+    .btn-outline:hover { background: #f1f5f9; }
+    .btn-success { background: #16a34a; color: white; }
+    .btn-success:hover { background: #15803d; }
+    .btn-danger { background: #dc2626; color: white; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-warning { background: #f59e0b; color: #1e293b; }
+    .btn-warning:hover { background: #d97706; }
+    .btn-sm { padding: 4px 12px; font-size: 0.8rem; }
+
+    /* inputs */
+    input, textarea {
+      border: 1px solid #e2e8f0;
+      border-radius: 30px;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      background: white;
+      width: 100%;
+      transition: 0.15s;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #2463eb;
+      box-shadow: 0 0 0 3px rgba(36,99,235,0.2);
+    }
+    .card {
+      background: #f8fafc;
+      border-radius: 24px;
+      padding: 16px 20px;
+      margin-top: 12px;
+      border: 1px solid #eef2f6;
+    }
+
+    /* menu */
+    .lang-grid {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 12px 0;
+    }
+    .lang-chip {
+      background: #eef2f6;
+      padding: 12px 28px;
+      border-radius: 60px;
+      font-size: 1.1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: 0.1s;
+      border: 1px solid transparent;
+    }
+    .lang-chip.active {
+      background: #2463eb;
+      color: white;
+      border-color: #2463eb;
+    }
+    .lang-chip:hover { background: #d9e2ef; }
+    .lang-chip.active:hover { background: #1a4fc0; }
+
+    .word-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #eef2f6;
+    }
+    .word-item:last-child { border-bottom: none; }
+
+    .flashcard-box {
+      background: white;
+      border-radius: 28px;
+      padding: 30px 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+      border: 1px solid #e2e8f0;
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .flashcard-word {
+      font-size: 2rem;
+      font-weight: 500;
+      color: #0f172a;
+    }
+    .flashcard-translation {
+      font-size: 1.5rem;
+      color: #334155;
+      margin-top: 8px;
+    }
+    .badge {
+      background: #dbeafe;
+      color: #1e3a8a;
+      border-radius: 40px;
+      padding: 2px 14px;
+      font-size: 0.8rem;
+    }
+
+    /* responsive */
+    @media (max-width: 600px) {
+      .app { padding: 16px; }
+      .lang-chip { padding: 8px 18px; font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- АВТОРИЗАЦИЯ -->
+  <div id="authScreen">
+    <h1 style="margin-bottom: 20px;">🔐 Вход / Регистрация</h1>
+    <div class="flex" style="margin-bottom: 8px;">
+      <input type="email" id="authEmail" placeholder="Email" style="flex:1;">
+      <input type="password" id="authPassword" placeholder="Пароль" style="flex:1;">
+    </div>
+    <div class="flex gap-8">
+      <button class="btn btn-primary" id="loginBtn">Войти</button>
+      <button class="btn btn-outline" id="registerBtn">Зарегистрироваться</button>
+    </div>
+    <div id="authError" class="text-center" style="color:#b91c1c; margin-top:10px;"></div>
+  </div>
+
+  <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
+  <div id="mainScreen" class="hidden">
+    <!-- верхняя панель -->
+    <div class="flex space-between">
+      <h2>📚 Мой словарь</h2>
+      <div class="flex">
+        <span class="badge" id="userEmailBadge">user@mail.com</span>
+        <button class="btn btn-outline btn-sm" id="logoutBtn">выйти</button>
+      </div>
+    </div>
+
+    <!-- МЕНЮ ЯЗЫКОВ -->
+    <div class="lang-grid" id="langMenu">
+      <div class="lang-chip active" data-lang="english">🇬🇧 Английский</div>
+      <div class="lang-chip" data-lang="german">🇩🇪 Немецкий</div>
+    </div>
+
+    <!-- ПОДМЕНЮ РАЗДЕЛОВ -->
+    <div class="flex gap-8" style="margin: 12px 0 8px;">
+      <button class="btn btn-primary btn-sm section-btn active" data-section="dictionary">📖 Словарь</button>
+      <button class="btn btn-outline btn-sm section-btn" data-section="flashcards">🃏 Карточки</button>
+      <button class="btn btn-outline btn-sm section-btn" data-section="learned">✅ Выучено</button>
+      <button class="btn btn-outline btn-sm section-btn" data-section="phrases">💬 Фразы</button>
+    </div>
+
+    <!-- КОНТЕЙНЕРЫ РАЗДЕЛОВ -->
+    <div id="dictionarySection" class="section-container">
+      <div class="flex" style="margin: 12px 0 6px;">
+        <input type="text" id="newWordInput" placeholder="слово" style="flex:1;">
+        <input type="text" id="newTranslationInput" placeholder="перевод" style="flex:1;">
+        <button class="btn btn-success" id="addWordBtn">➕</button>
+      </div>
+      <div id="dictionaryList" class="card"></div>
+    </div>
+
+    <div id="flashcardsSection" class="section-container hidden">
+      <div class="flashcard-box" id="flashcardBox">
+        <div id="flashcardContent">
+          <div class="flashcard-word" id="fcWord">слово</div>
+          <div class="flashcard-translation hidden" id="fcTranslation">перевод</div>
+        </div>
+      </div>
+      <div class="flex space-between" style="margin-top: 14px;">
+        <div class="flex gap-8">
+          <button class="btn btn-success btn-sm" id="fcRemember">✅ помню</button>
+          <button class="btn btn-warning btn-sm" id="fcForget">❌ не помню</button>
+          <button class="btn btn-outline btn-sm" id="fcNever">🚫 не учить</button>
+        </div>
+        <span id="fcCounter" class="badge">0 осталось</span>
+      </div>
+    </div>
+
+    <div id="learnedSection" class="section-container hidden">
+      <h3>📊 Уже выучено <span id="learnedCount">0</span> слов</h3>
+      <div id="learnedList" class="card"></div>
+    </div>
+
+    <div id="phrasesSection" class="section-container hidden">
+      <div class="flex" style="margin: 12px 0 6px;">
+        <input type="text" id="newPhraseInput" placeholder="фраза" style="flex:1;">
+        <input type="text" id="newPhraseTranslationInput" placeholder="перевод" style="flex:1;">
+        <button class="btn btn-success" id="addPhraseBtn">➕</button>
+      </div>
+      <div id="phraseList" class="card"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // ------ SUPABASE ------
+    const SUPABASE_URL = 'https://ethstgtnpbvilqqtrfap.supabase.co'; // замените на ваш URL
+    const SUPABASE_KEY = 'sb_publishable_CgP6FCcX4DDnjzrC6X_2Og_7Cvcr_aA';               // замените на ваш anon/public ключ
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ------ СОСТОЯНИЕ ------
+    let currentUser = null;
+    let currentLang = 'english';    // 'english' или 'german'
+    let currentSection = 'dictionary';
+    let words = [];                // все слова текущего языка
+    let phrases = [];
+    // для карточек: очередь (не выученные)
+    let flashcardQueue = [];
+    let currentCardIndex = 0;
+    // слова, помеченные "не учить" (learned) храним в отдельном массиве
+    let learnedWords = [];
+
+    // DOM ссылки
+    const authScreen = document.getElementById('authScreen');
+    const mainScreen = document.getElementById('mainScreen');
+    const authEmail = document.getElementById('authEmail');
+    const authPassword = document.getElementById('authPassword');
+    const authError = document.getElementById('authError');
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const userEmailBadge = document.getElementById('userEmailBadge');
+
+    const langChips = document.querySelectorAll('.lang-chip');
+    const sectionBtns = document.querySelectorAll('.section-btn');
+
+    const dictSection = document.getElementById('dictionarySection');
+    const flashcardsSection = document.getElementById('flashcardsSection');
+    const learnedSection = document.getElementById('learnedSection');
+    const phrasesSection = document.getElementById('phrasesSection');
+
+    const dictionaryList = document.getElementById('dictionaryList');
+    const newWordInput = document.getElementById('newWordInput');
+    const newTranslationInput = document.getElementById('newTranslationInput');
+    const addWordBtn = document.getElementById('addWordBtn');
+
+    const fcWord = document.getElementById('fcWord');
+    const fcTranslation = document.getElementById('fcTranslation');
+    const fcRemember = document.getElementById('fcRemember');
+    const fcForget = document.getElementById('fcForget');
+    const fcNever = document.getElementById('fcNever');
+    const fcCounter = document.getElementById('fcCounter');
+
+    const learnedList = document.getElementById('learnedList');
+    const learnedCount = document.getElementById('learnedCount');
+
+    const newPhraseInput = document.getElementById('newPhraseInput');
+    const newPhraseTranslationInput = document.getElementById('newPhraseTranslationInput');
+    const addPhraseBtn = document.getElementById('addPhraseBtn');
+    const phraseList = document.getElementById('phraseList');
+
+    // ------ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ------
+    function showAuthError(msg) { authError.textContent = msg; }
+
+    // Загрузка данных из Supabase
+    async function loadData() {
+      if (!currentUser) return;
+      // слова
+      const { data: wordsData, error: wErr } = await supabase
+        .from('words')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .eq('lang', currentLang);
+      if (wErr) console.error(wErr);
+      words = wordsData || [];
+
+      // learned (выученные) - отдельная таблица или поле? будем хранить в таблице learned
+      const { data: learnedData, error: lErr } = await supabase
+        .from('learned')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .eq('lang', currentLang);
+      if (lErr) console.error(lErr);
+      learnedWords = learnedData || [];
+
+      // фразы
+      const { data: phrasesData, error: pErr } = await supabase
+        .from('phrases')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .eq('lang', currentLang);
+      if (pErr) console.error(pErr);
+      phrases = phrasesData || [];
+
+      // обновить очередь карточек (только слова не из learned)
+      const learnedIds = new Set(learnedWords.map(w => w.word_id));
+      flashcardQueue = words.filter(w => !learnedIds.has(w.id));
+      // перемешать для случайности
+      flashcardQueue = shuffleArray(flashcardQueue);
+      currentCardIndex = 0;
+
+      renderAll();
+    }
+
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    // ------ ОТРИСОВКА ------
+    function renderDictionary() {
+      if (!words.length) {
+        dictionaryList.innerHTML = '<div class="text-center" style="color:#64748b;">Словарь пуст. Добавьте слова!</div>';
+        return;
+      }
+      // сортировка по иностранному слову (по алфавиту)
+      const sorted = [...words].sort((a,b) => a.word.localeCompare(b.word));
+      dictionaryList.innerHTML = sorted.map(w => `
+        <div class="word-item">
+          <span><strong>${w.word}</strong> — ${w.translation}</span>
+          <div>
+            <button class="btn btn-outline btn-sm delete-word" data-id="${w.id}">🗑</button>
+          </div>
+        </div>
+      `).join('');
+      // удаление слова
+      document.querySelectorAll('.delete-word').forEach(btn => {
+        btn.addEventListener('click', async function() {
+          const id = this.dataset.id;
+          if (!confirm('Удалить слово?')) return;
+          await supabase.from('words').delete().eq('id', id);
+          // также удалить из learned если есть
+          await supabase.from('learned').delete().eq('word_id', id);
+          await loadData();
+        });
+      });
+    }
+
+    function renderFlashcards() {
+      if (!flashcardQueue.length) {
+        fcWord.textContent = '🎉 Все слова выучены!';
+        fcTranslation.classList.add('hidden');
+        fcCounter.textContent = '0 осталось';
+        return;
+      }
+      const word = flashcardQueue[currentCardIndex] || flashcardQueue[0];
+      if (word) {
+        fcWord.textContent = word.word;
+        fcTranslation.textContent = word.translation;
+        fcTranslation.classList.add('hidden');
+        fcCounter.textContent = `${flashcardQueue.length} осталось`;
+      }
+    }
+
+    function renderLearned() {
+      const count = learnedWords.length;
+      learnedCount.textContent = count;
+      if (!count) {
+        learnedList.innerHTML = '<div class="text-center" style="color:#64748b;">Нет выученных слов</div>';
+        return;
+      }
+      learnedList.innerHTML = learnedWords.map(w => `
+        <div class="word-item">
+          <span><strong>${w.word}</strong> — ${w.translation}</span>
+          <button class="btn btn-outline btn-sm unlearn-word" data-id="${w.id}">↩️ вернуть</button>
+        </div>
+      `).join('');
+      document.querySelectorAll('.unlearn-word').forEach(btn => {
+        btn.addEventListener('click', async function() {
+          const id = this.dataset.id;
+          await supabase.from('learned').delete().eq('id', id);
+          await loadData();
+        });
+      });
+    }
+
+    function renderPhrases() {
+      if (!phrases.length) {
+        phraseList.innerHTML = '<div class="text-center" style="color:#64748b;">Нет фраз. Добавьте!</div>';
+        return;
+      }
+      phraseList.innerHTML = phrases.map(p => `
+        <div class="word-item">
+          <span><strong>${p.phrase}</strong> — ${p.translation}</span>
+          <button class="btn btn-outline btn-sm delete-phrase" data-id="${p.id}">🗑</button>
+        </div>
+      `).join('');
+      document.querySelectorAll('.delete-phrase').forEach(btn => {
+        btn.addEventListener('click', async function() {
+          const id = this.dataset.id;
+          if (!confirm('Удалить фразу?')) return;
+          await supabase.from('phrases').delete().eq('id', id);
+          await loadData();
+        });
+      });
+    }
+
+    function renderAll() {
+      renderDictionary();
+      renderFlashcards();
+      renderLearned();
+      renderPhrases();
+    }
+
+    // ------ ДОБАВЛЕНИЕ СЛОВА ------
+    addWordBtn.addEventListener('click', async function() {
+      const word = newWordInput.value.trim();
+      const translation = newTranslationInput.value.trim();
+      if (!word || !translation) { alert('Заполните оба поля'); return; }
+      const { data, error } = await supabase.from('words').insert({
+        user_id: currentUser.id,
+        lang: currentLang,
+        word,
+        translation
+      });
+      if (error) { alert('Ошибка: ' + error.message); return; }
+      newWordInput.value = '';
+      newTranslationInput.value = '';
+      await loadData();
+    });
+
+    // ------ ДОБАВЛЕНИЕ ФРАЗЫ ------
+    addPhraseBtn.addEventListener('click', async function() {
+      const phrase = newPhraseInput.value.trim();
+      const translation = newPhraseTranslationInput.value.trim();
+      if (!phrase || !translation) { alert('Заполните оба поля'); return; }
+      const { data, error } = await supabase.from('phrases').insert({
+        user_id: currentUser.id,
+        lang: currentLang,
+        phrase,
+        translation
+      });
+      if (error) { alert('Ошибка: ' + error.message); return; }
+      newPhraseInput.value = '';
+      newPhraseTranslationInput.value = '';
+      await loadData();
+    });
+
+    // ------ КАРТОЧКИ: логика ------
+    function nextCard() {
+      if (flashcardQueue.length === 0) {
+        renderFlashcards();
+        return;
+      }
+      currentCardIndex = (currentCardIndex + 1) % flashcardQueue.length;
+      renderFlashcards();
+    }
+
+    fcRemember.addEventListener('click', function() {
+      // показать перевод, убрать из очереди
+      const word = flashcardQueue[currentCardIndex];
+      if (!word) return;
+      fcTranslation.classList.remove('hidden');
+      // удаляем из очереди
+      flashcardQueue.splice(currentCardIndex, 1);
+      if (flashcardQueue.length === 0) {
+        renderFlashcards();
+        return;
+      }
+      if (currentCardIndex >= flashcardQueue.length) currentCardIndex = 0;
+      renderFlashcards();
+    });
+
+    fcForget.addEventListener('click', function() {
+      // показать перевод, слово остаётся в очереди, перемешиваем или просто пропускаем
+      const word = flashcardQueue[currentCardIndex];
+      if (!word) return;
+      fcTranslation.classList.remove('hidden');
+      // переместить в конец и сдвинуть
+      const moved = flashcardQueue.splice(currentCardIndex, 1)[0];
+      flashcardQueue.push(moved);
+      currentCardIndex = 0; // перезапуск
+      renderFlashcards();
+    });
+
+    fcNever.addEventListener('click', async function() {
+      const word = flashcardQueue[currentCardIndex];
+      if (!word) return;
+      // добавить в learned
+      const { error } = await supabase.from('learned').insert({
+        user_id: currentUser.id,
+        lang: currentLang,
+        word_id: word.id,
+        word: word.word,
+        translation: word.translation
+      });
+      if (error) { alert('Ошибка: ' + error.message); return; }
+      // удалить из очереди
+      flashcardQueue.splice(currentCardIndex, 1);
+      if (flashcardQueue.length === 0) {
+        renderFlashcards();
+        await loadData();
+        return;
+      }
+      if (currentCardIndex >= flashcardQueue.length) currentCardIndex = 0;
+      await loadData(); // перезагрузка
+    });
+
+    // ------ ПЕРЕКЛЮЧЕНИЕ ЯЗЫКА ------
+    langChips.forEach(chip => {
+      chip.addEventListener('click', function() {
+        langChips.forEach(c => c.classList.remove('active'));
+        this.classList.add('active');
+        currentLang = this.dataset.lang;
+        loadData();
+      });
+    });
+
+    // ------ ПЕРЕКЛЮЧЕНИЕ РАЗДЕЛОВ ------
+    sectionBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        sectionBtns.forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        const sec = this.dataset.section;
+        currentSection = sec;
+        document.querySelectorAll('.section-container').forEach(el => el.classList.add('hidden'));
+        if (sec === 'dictionary') dictSection.classList.remove('hidden');
+        else if (sec === 'flashcards') flashcardsSection.classList.remove('hidden');
+        else if (sec === 'learned') learnedSection.classList.remove('hidden');
+        else if (sec === 'phrases') phrasesSection.classList.remove('hidden');
+        // перерисовка
+        renderAll();
+      });
+    });
+
+    // ------ АВТОРИЗАЦИЯ ------
+    async function handleAuth(email, password, isLogin) {
+      try {
+        let result;
+        if (isLogin) {
+          result = await supabase.auth.signInWithPassword({ email, password });
+        } else {
+          result = await supabase.auth.signUp({ email, password });
+        }
+        if (result.error) throw result.error;
+        currentUser = result.data.user;
+        userEmailBadge.textContent = currentUser.email;
+        authScreen.classList.add('hidden');
+        mainScreen.classList.remove('hidden');
+        await loadData();
+      } catch (e) {
+        showAuthError(e.message);
+      }
+    }
+
+    loginBtn.addEventListener('click', () => {
+      handleAuth(authEmail.value, authPassword.value, true);
+    });
+    registerBtn.addEventListener('click', () => {
+      handleAuth(authEmail.value, authPassword.value, false);
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      currentUser = null;
+      authScreen.classList.remove('hidden');
+      mainScreen.classList.add('hidden');
+      authEmail.value = '';
+      authPassword.value = '';
+      authError.textContent = '';
+    });
+
+    // проверка сессии при загрузке
+    (async function checkSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        currentUser = session.user;
+        userEmailBadge.textContent = currentUser.email;
+        authScreen.classList.add('hidden');
+        mainScreen.classList.remove('hidden');
+        await loadData();
+      }
+    })();
+
+  })();
+</script>
+</body>
+</html>
