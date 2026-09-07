@@ -589,19 +589,28 @@
   });
 
   // ===== КАРТОЧКИ =====
-  function nextCard() {
-    if (flashcardQueue.length === 0) {
-      renderFlashcards();
-      return;
-    }
-    currentCardIndex = (currentCardIndex + 1) % flashcardQueue.length;
-    renderFlashcards();
+ // ===== КАРТОЧКИ =====
+function renderFlashcards() {
+  if (!flashcardQueue.length) {
+    fcWord.textContent = '🎉 Все слова выучены!';
+    fcTranslation.classList.add('hidden');
+    fcCounter.textContent = '0 осталось';
+    return;
   }
+  const word = flashcardQueue[currentCardIndex] || flashcardQueue[0];
+  if (word) {
+    fcWord.textContent = word.word;
+    fcTranslation.textContent = word.translation;
+    fcTranslation.classList.add('hidden');
+    fcCounter.textContent = `${flashcardQueue.length} осталось`;
+  }
+}
 
-  fcRemember.addEventListener('click', function() {
-    const word = flashcardQueue[currentCardIndex];
-    if (!word) return;
-    fcTranslation.classList.remove('hidden');
+fcRemember.addEventListener('click', function() {
+  const word = flashcardQueue[currentCardIndex];
+  if (!word) return;
+  fcTranslation.classList.remove('hidden'); // Показываем перевод
+  setTimeout(() => {
     flashcardQueue.splice(currentCardIndex, 1);
     if (flashcardQueue.length === 0) {
       renderFlashcards();
@@ -609,22 +618,26 @@
     }
     if (currentCardIndex >= flashcardQueue.length) currentCardIndex = 0;
     renderFlashcards();
-  });
+  }, 800); // Даём время посмотреть перевод
+});
 
-  fcForget.addEventListener('click', function() {
-    const word = flashcardQueue[currentCardIndex];
-    if (!word) return;
-    fcTranslation.classList.remove('hidden');
+fcForget.addEventListener('click', function() {
+  const word = flashcardQueue[currentCardIndex];
+  if (!word) return;
+  fcTranslation.classList.remove('hidden'); // Показываем перевод
+  setTimeout(() => {
     const moved = flashcardQueue.splice(currentCardIndex, 1)[0];
     flashcardQueue.push(moved);
     currentCardIndex = 0;
     renderFlashcards();
-  });
+  }, 800);
+});
 
-  fcNever.addEventListener('click', async function() {
-    const word = flashcardQueue[currentCardIndex];
-    if (!word) return;
-    
+fcNever.addEventListener('click', async function() {
+  const word = flashcardQueue[currentCardIndex];
+  if (!word) return;
+  fcTranslation.classList.remove('hidden'); // Показываем перевод
+  setTimeout(async () => {
     const { error } = await supabase.from('learned').insert({
       user_id: currentUser.id,
       lang: currentLang,
@@ -642,8 +655,8 @@
     }
     if (currentCardIndex >= flashcardQueue.length) currentCardIndex = 0;
     await loadData();
-  });
-
+  }, 800);
+});
   // ===== ПЕРЕКЛЮЧЕНИЕ РАЗДЕЛОВ =====
   sectionBtns.forEach(btn => {
     btn.addEventListener('click', function() {
