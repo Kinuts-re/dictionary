@@ -480,23 +480,6 @@
         await loadData();
       });
     });
-  }
-
-  function renderFlashcards() {
-    if (!flashcardQueue.length) {
-      fcWord.textContent = '🎉 Все слова выучены!';
-      fcTranslation.classList.add('hidden');
-      fcCounter.textContent = '0 осталось';
-      return;
-    }
-    const word = flashcardQueue[currentCardIndex] || flashcardQueue[0];
-    if (word) {
-      fcWord.textContent = word.word;
-      fcTranslation.textContent = word.translation;
-      fcTranslation.classList.add('hidden');
-      fcCounter.textContent = `${flashcardQueue.length} осталось`;
-    }
-  }
 
   function renderLearned() {
     const count = learned.length;
@@ -588,7 +571,6 @@
     await loadData();
   });
 
-  // ===== КАРТОЧКИ =====
  // ===== КАРТОЧКИ =====
 function renderFlashcards() {
   if (!flashcardQueue.length) {
@@ -618,7 +600,7 @@ fcRemember.addEventListener('click', function() {
     }
     if (currentCardIndex >= flashcardQueue.length) currentCardIndex = 0;
     renderFlashcards();
-  }, 800); // Даём время посмотреть перевод
+  }, 2000); // Даём время посмотреть перевод
 });
 
 fcForget.addEventListener('click', function() {
