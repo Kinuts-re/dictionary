@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Мой словарь · Изучение языков</title>
+  <title>Мой словарь · Supabase</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; }
@@ -210,8 +210,8 @@
 <script>
 (function() {
   // ===== SUPABASE =====
-  const SUPABASE_URL = 'https://ethstgtnpbvilqqtrfap.supabase.co';  // ЗАМЕНИТЕ
-  const SUPABASE_KEY = 'sb_publishable_CgP6FCcX4DDnjzrC6X_2Og_7Cvcr_aA';                // ЗАМЕНИТЕ
+  const SUPABASE_URL = 'https://ethstgtnpbvilqqtrfap.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_CgP6FCcX4DDnjzrC6X_2Og_7Cvcr_aA';
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   // ===== СОСТОЯНИЕ =====
@@ -480,6 +480,23 @@
         await loadData();
       });
     });
+  }
+
+  function renderFlashcards() {
+    if (!flashcardQueue.length) {
+      fcWord.textContent = '🎉 Все слова выучены!';
+      fcTranslation.classList.add('hidden');
+      fcCounter.textContent = '0 осталось';
+      return;
+    }
+    const word = flashcardQueue[currentCardIndex] || flashcardQueue[0];
+    if (word) {
+      fcWord.textContent = word.word;
+      fcTranslation.textContent = word.translation;
+      fcTranslation.classList.add('hidden');
+      fcCounter.textContent = `${flashcardQueue.length} осталось`;
+    }
+  }
 
   function renderLearned() {
     const count = learned.length;
@@ -571,74 +588,59 @@
     await loadData();
   });
 
- // ===== КАРТОЧКИ =====
-function renderFlashcards() {
-  if (!flashcardQueue.length) {
-    fcWord.textContent = '🎉 Все слова выучены!';
-    fcTranslation.classList.add('hidden');
-    fcCounter.textContent = '0 осталось';
-    return;
-  }
-  const word = flashcardQueue[currentCardIndex] || flashcardQueue[0];
-  if (word) {
-    fcWord.textContent = word.word;
-    fcTranslation.textContent = word.translation;
-    fcTranslation.classList.add('hidden');
-    fcCounter.textContent = `${flashcardQueue.length} осталось`;
-  }
-}
-
-fcRemember.addEventListener('click', function() {
-  const word = flashcardQueue[currentCardIndex];
-  if (!word) return;
-  fcTranslation.classList.remove('hidden'); // Показываем перевод
-  setTimeout(() => {
-    flashcardQueue.splice(currentCardIndex, 1);
-    if (flashcardQueue.length === 0) {
+  // ===== КАРТОЧКИ =====
+  fcRemember.addEventListener('click', function() {
+    const word = flashcardQueue[currentCardIndex];
+    if (!word) return;
+    fcTranslation.classList.remove('hidden');
+    setTimeout(() => {
+      flashcardQueue.splice(currentCardIndex, 1);
+      if (flashcardQueue.length === 0) {
+        renderFlashcards();
+        return;
+      }
+      if (currentCardIndex >= flashcardQueue.length) currentCardIndex = 0;
       renderFlashcards();
-      return;
-    }
-    if (currentCardIndex >= flashcardQueue.length) currentCardIndex = 0;
-    renderFlashcards();
-  }, 2000); // Даём время посмотреть перевод
-});
+    }, 2000);
+  });
 
-fcForget.addEventListener('click', function() {
-  const word = flashcardQueue[currentCardIndex];
-  if (!word) return;
-  fcTranslation.classList.remove('hidden'); // Показываем перевод
-  setTimeout(() => {
-    const moved = flashcardQueue.splice(currentCardIndex, 1)[0];
-    flashcardQueue.push(moved);
-    currentCardIndex = 0;
-    renderFlashcards();
-  }, 800);
-});
-
-fcNever.addEventListener('click', async function() {
-  const word = flashcardQueue[currentCardIndex];
-  if (!word) return;
-  fcTranslation.classList.remove('hidden'); // Показываем перевод
-  setTimeout(async () => {
-    const { error } = await supabase.from('learned').insert({
-      user_id: currentUser.id,
-      lang: currentLang,
-      word_id: word.id,
-      word: word.word,
-      translation: word.translation
-    });
-    if (error) { alert('Ошибка: ' + error.message); return; }
-    
-    flashcardQueue.splice(currentCardIndex, 1);
-    if (flashcardQueue.length === 0) {
+  fcForget.addEventListener('click', function() {
+    const word = flashcardQueue[currentCardIndex];
+    if (!word) return;
+    fcTranslation.classList.remove('hidden');
+    setTimeout(() => {
+      const moved = flashcardQueue.splice(currentCardIndex, 1)[0];
+      flashcardQueue.push(moved);
+      currentCardIndex = 0;
       renderFlashcards();
+    }, 2000);
+  });
+
+  fcNever.addEventListener('click', async function() {
+    const word = flashcardQueue[currentCardIndex];
+    if (!word) return;
+    fcTranslation.classList.remove('hidden');
+    setTimeout(async () => {
+      const { error } = await supabase.from('learned').insert({
+        user_id: currentUser.id,
+        lang: currentLang,
+        word_id: word.id,
+        word: word.word,
+        translation: word.translation
+      });
+      if (error) { alert('Ошибка: ' + error.message); return; }
+      
+      flashcardQueue.splice(currentCardIndex, 1);
+      if (flashcardQueue.length === 0) {
+        renderFlashcards();
+        await loadData();
+        return;
+      }
+      if (currentCardIndex >= flashcardQueue.length) currentCardIndex = 0;
       await loadData();
-      return;
-    }
-    if (currentCardIndex >= flashcardQueue.length) currentCardIndex = 0;
-    await loadData();
-  }, 800);
-});
+    }, 2000);
+  });
+
   // ===== ПЕРЕКЛЮЧЕНИЕ РАЗДЕЛОВ =====
   sectionBtns.forEach(btn => {
     btn.addEventListener('click', function() {
