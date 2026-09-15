@@ -305,7 +305,6 @@
           lang: lang
         });
       }
-      // Перезагружаем языки
       const { data: newLangData } = await supabase
         .from('user_languages')
         .select('lang')
@@ -342,7 +341,7 @@
     if (pErr) console.error(pErr);
     phrases = phrasesData || [];
 
-    // Обновляем очередь карточек
+    // Обновляем очередь карточек (исключаем выученные)
     const learnedIds = new Set(learned.map(w => w.word_id));
     flashcardQueue = words.filter(w => !learnedIds.has(w.id));
     flashcardQueue = shuffleArray(flashcardQueue);
@@ -379,7 +378,6 @@
     const newLang = newLangInput.value.trim().toLowerCase();
     if (!newLang) { alert('Введите название языка'); return; }
     
-    // Проверяем, есть ли уже такой язык
     const { data: existing } = await supabase
       .from('user_languages')
       .select('lang')
@@ -404,7 +402,6 @@
 
   // ===== УДАЛЕНИЕ ЯЗЫКА =====
   window.deleteLanguage = async function(lang) {
-    // Проверяем, сколько языков у пользователя
     const { data: langs } = await supabase
       .from('user_languages')
       .select('lang')
@@ -417,33 +414,10 @@
 
     if (!confirm(`Удалить язык "${capitalize(lang)}" и все его данные?`)) return;
 
-    // Удаляем язык из user_languages
-    await supabase
-      .from('user_languages')
-      .delete()
-      .eq('user_id', currentUser.id)
-      .eq('lang', lang);
-
-    // Удаляем все слова этого языка
-    await supabase
-      .from('words')
-      .delete()
-      .eq('user_id', currentUser.id)
-      .eq('lang', lang);
-
-    // Удаляем выученные слова этого языка
-    await supabase
-      .from('learned')
-      .delete()
-      .eq('user_id', currentUser.id)
-      .eq('lang', lang);
-
-    // Удаляем фразы этого языка
-    await supabase
-      .from('phrases')
-      .delete()
-      .eq('user_id', currentUser.id)
-      .eq('lang', lang);
+    await supabase.from('user_languages').delete().eq('user_id', currentUser.id).eq('lang', lang);
+    await supabase.from('words').delete().eq('user_id', currentUser.id).eq('lang', lang);
+    await supabase.from('learned').delete().eq('user_id', currentUser.id).eq('lang', lang);
+    await supabase.from('phrases').delete().eq('user_id', currentUser.id).eq('lang', lang);
 
     if (currentLang === lang) {
       const { data: remaining } = await supabase
@@ -457,13 +431,17 @@
     await loadData();
   };
 
-  // ===== ОТРИСОВКА ВСЕХ РАЗДЕЛОВ =====
+  // ===== ОТРИСОВКА СЛОВАРЯ (без выученных) =====
   function renderDictionary() {
-    if (!words.length) {
+    const learnedIds = new Set(learned.map(l => l.word_id));
+    const activeWords = words.filter(w => !learnedIds.has(w.id));
+    
+    if (!activeWords.length) {
       dictionaryList.innerHTML = '<div class="text-muted text-center">Словарь пуст. Добавьте слова!</div>';
       return;
     }
-    const sorted = [...words].sort((a,b) => a.word.localeCompare(b.word));
+    
+    const sorted = [...activeWords].sort((a,b) => a.word.localeCompare(b.word));
     dictionaryList.innerHTML = sorted.map(w => `
       <div class="word-item">
         <span><strong>${w.word}</strong> — ${w.translation}</span>
@@ -482,6 +460,7 @@
     });
   }
 
+  // ===== ОТРИСОВКА КАРТОЧЕК =====
   function renderFlashcards() {
     if (!flashcardQueue.length) {
       fcWord.textContent = '🎉 Все слова выучены!';
@@ -489,7 +468,10 @@
       fcCounter.textContent = '0 осталось';
       return;
     }
-    const word = flashcardQueue[currentCardIndex] || flashcardQueue[0];
+    if (currentCardIndex >= flashcardQueue.length) {
+      currentCardIndex = 0;
+    }
+    const word = flashcardQueue[currentCardIndex];
     if (word) {
       fcWord.textContent = word.word;
       fcTranslation.textContent = word.translation;
@@ -498,6 +480,7 @@
     }
   }
 
+  // ===== ОТРИСОВКА ВЫУЧЕННЫХ =====
   function renderLearned() {
     const count = learned.length;
     learnedCount.textContent = count;
@@ -515,12 +498,15 @@
     document.querySelectorAll('.unlearn-word').forEach(btn => {
       btn.addEventListener('click', async function() {
         const id = this.dataset.id;
-        await supabase.from('learned').delete().eq('id', id);
+        if (!confirm('Вернуть слово в словарь?')) return;
+        const { error } = await supabase.from('learned').delete().eq('id', id);
+        if (error) { alert('Ошибка: ' + error.message); return; }
         await loadData();
       });
     });
   }
 
+  // ===== ОТРИСОВКА ФРАЗ =====
   function renderPhrases() {
     if (!phrases.length) {
       phraseList.innerHTML = '<div class="text-muted text-center">Нет фраз. Добавьте!</div>';
@@ -621,22 +607,25 @@
     if (!word) return;
     fcTranslation.classList.remove('hidden');
     setTimeout(async () => {
-      const { error } = await supabase.from('learned').insert({
-        user_id: currentUser.id,
-        lang: currentLang,
-        word_id: word.id,
-        word: word.word,
-        translation: word.translation
-      });
-      if (error) { alert('Ошибка: ' + error.message); return; }
+      // Проверяем, нет ли уже этого слова в learned
+      const { data: existing } = await supabase
+        .from('learned')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .eq('word_id', word.id);
       
-      flashcardQueue.splice(currentCardIndex, 1);
-      if (flashcardQueue.length === 0) {
-        renderFlashcards();
-        await loadData();
-        return;
+      if (!existing || existing.length === 0) {
+        const { error } = await supabase.from('learned').insert({
+          user_id: currentUser.id,
+          lang: currentLang,
+          word_id: word.id,
+          word: word.word,
+          translation: word.translation
+        });
+        if (error) { alert('Ошибка: ' + error.message); return; }
       }
-      if (currentCardIndex >= flashcardQueue.length) currentCardIndex = 0;
+      
+      // Перезагружаем данные — слово исчезнет из словаря и карточек
       await loadData();
     }, 2000);
   });
