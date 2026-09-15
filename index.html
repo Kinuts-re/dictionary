@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Мой словарь · Supabase</title>
+  <title>Мой словарь</title>
+  <meta name="theme-color" content="#2563eb">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; }
@@ -45,6 +48,7 @@
     .btn-outline { background: #e2e8f0; color: #1e293b; }
     .btn-outline:hover { background: #cbd5e1; }
     .btn-sm { padding: 4px 14px; font-size: 0.8rem; }
+    .btn-icon { padding: 6px 10px; font-size: 1rem; line-height: 1; }
 
     input {
       border: 1px solid #d1d5db;
@@ -57,8 +61,10 @@
     .input-sm { padding: 6px 14px; font-size: 0.85rem; }
 
     .card { background: #f8fafc; border-radius: 16px; padding: 16px; margin-top: 12px; border: 1px solid #e2e8f0; }
-    .word-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
+    .word-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e2e8f0; gap: 8px; }
     .word-item:last-child { border-bottom: none; }
+    .word-item .word-text { flex: 1; }
+    .word-item .word-actions { display: flex; gap: 4px; }
 
     .lang-chip {
       padding: 8px 20px;
@@ -99,21 +105,30 @@
     .flashcard-translation { font-size: 1.6rem; color: #334155; margin-top: 8px; }
     .badge { background: #dbeafe; color: #1e3a8a; border-radius: 40px; padding: 2px 16px; font-size: 0.8rem; }
 
-    .lang-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 6px 12px;
-      background: white;
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
-    }
-
     #authError { color: #b91c1c; margin-top: 8px; }
+
+    /* Кнопка установки PWA */
+    #installBtn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 40px;
+      cursor: pointer;
+      font-weight: 500;
+      box-shadow: 0 8px 20px rgba(37,99,235,0.4);
+      z-index: 1000;
+      display: none;
+    }
+    #installBtn:hover { background: #1d4ed8; }
 
     @media (max-width: 600px) {
       .app { padding: 16px; }
       .flashcard-word { font-size: 1.6rem; }
+      .flashcard-translation { font-size: 1.2rem; }
     }
   </style>
 </head>
@@ -177,6 +192,7 @@
         <div id="flashcardContent">
           <div class="flashcard-word" id="fcWord">слово</div>
           <div class="flashcard-translation hidden" id="fcTranslation">перевод</div>
+          <button class="btn btn-outline btn-sm" id="fcSpeak" style="margin-top:12px;">🔊 Прослушать</button>
         </div>
       </div>
       <div class="flex space-between" style="margin-top: 14px;">
@@ -207,12 +223,29 @@
   </div>
 </div>
 
+<!-- Кнопка установки PWA -->
+<button id="installBtn">📲 Установить приложение</button>
+
 <script>
 (function() {
   // ===== SUPABASE =====
   const SUPABASE_URL = 'https://ethstgtnpbvilqqtrfap.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_CgP6FCcX4DDnjzrC6X_2Og_7Cvcr_aA';
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // ===== ЯЗЫКИ ДЛЯ ОЗВУЧКИ =====
+  const SPEECH_LANGS = {
+    english: 'en-US',
+    german: 'de-DE',
+    french: 'fr-FR',
+    spanish: 'es-ES',
+    italian: 'it-IT',
+    russian: 'ru-RU',
+    japanese: 'ja-JP',
+    chinese: 'zh-CN',
+    portuguese: 'pt-PT',
+    korean: 'ko-KR'
+  };
 
   // ===== СОСТОЯНИЕ =====
   let currentUser = null;
@@ -252,6 +285,7 @@
 
   const fcWord = document.getElementById('fcWord');
   const fcTranslation = document.getElementById('fcTranslation');
+  const fcSpeak = document.getElementById('fcSpeak');
   const fcRemember = document.getElementById('fcRemember');
   const fcForget = document.getElementById('fcForget');
   const fcNever = document.getElementById('fcNever');
@@ -265,6 +299,22 @@
   const addPhraseBtn = document.getElementById('addPhraseBtn');
   const phraseList = document.getElementById('phraseList');
 
+  const installBtn = document.getElementById('installBtn');
+
+  // ===== ОЗВУЧКА =====
+  function speak(text, langCode) {
+    if (!('speechSynthesis' in window)) {
+      alert('Ваш браузер не поддерживает озвучку');
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = langCode || SPEECH_LANGS[currentLang] || 'en-US';
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  }
+
   // ===== ВСПОМОГАТЕЛЬНЫЕ =====
   function showAuthError(msg) { authError.textContent = msg; }
 
@@ -277,7 +327,7 @@
   }
 
   function getLangEmoji(lang) {
-    const emojis = { english: '🇬🇧', german: '🇩🇪', french: '🇫🇷', spanish: '🇪🇸', italian: '🇮🇹', russian: '🇷🇺' };
+    const emojis = { english: '🇬🇧', german: '🇩🇪', french: '🇫🇷', spanish: '🇪🇸', italian: '🇮🇹', russian: '🇷🇺', japanese: '🇯🇵', chinese: '🇨🇳', portuguese: '🇵🇹', korean: '🇰🇷' };
     return emojis[lang.toLowerCase()] || '🌍';
   }
 
@@ -285,18 +335,22 @@
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function(m) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+    });
+  }
+
   // ===== ЗАГРУЗКА ДАННЫХ =====
   async function loadData() {
     if (!currentUser) return;
 
-    // Загружаем список языков пользователя
     const { data: langData, error: langErr } = await supabase
       .from('user_languages')
       .select('lang')
       .eq('user_id', currentUser.id);
     if (langErr) console.error('Error loading languages:', langErr);
     
-    // Если нет языков, создаём английский и немецкий по умолчанию
     if (!langData || langData.length === 0) {
       const defaultLangs = ['english', 'german'];
       for (const lang of defaultLangs) {
@@ -314,7 +368,6 @@
       renderLanguages(langData);
     }
 
-    // Загружаем слова
     const { data: wordsData, error: wErr } = await supabase
       .from('words')
       .select('*')
@@ -323,7 +376,6 @@
     if (wErr) console.error(wErr);
     words = wordsData || [];
 
-    // Загружаем выученные
     const { data: learnedData, error: lErr } = await supabase
       .from('learned')
       .select('*')
@@ -332,7 +384,6 @@
     if (lErr) console.error(lErr);
     learned = learnedData || [];
 
-    // Загружаем фразы
     const { data: phrasesData, error: pErr } = await supabase
       .from('phrases')
       .select('*')
@@ -341,7 +392,6 @@
     if (pErr) console.error(pErr);
     phrases = phrasesData || [];
 
-    // Обновляем очередь карточек (исключаем выученные)
     const learnedIds = new Set(learned.map(w => w.word_id));
     flashcardQueue = words.filter(w => !learnedIds.has(w.id));
     flashcardQueue = shuffleArray(flashcardQueue);
@@ -431,7 +481,7 @@
     await loadData();
   };
 
-  // ===== ОТРИСОВКА СЛОВАРЯ (без выученных) =====
+  // ===== СЛОВАРЬ =====
   function renderDictionary() {
     const learnedIds = new Set(learned.map(l => l.word_id));
     const activeWords = words.filter(w => !learnedIds.has(w.id));
@@ -444,10 +494,19 @@
     const sorted = [...activeWords].sort((a,b) => a.word.localeCompare(b.word));
     dictionaryList.innerHTML = sorted.map(w => `
       <div class="word-item">
-        <span><strong>${w.word}</strong> — ${w.translation}</span>
-        <button class="btn btn-outline btn-sm delete-word" data-id="${w.id}">🗑</button>
+        <span class="word-text"><strong>${escapeHtml(w.word)}</strong> — ${escapeHtml(w.translation)}</span>
+        <div class="word-actions">
+          <button class="btn btn-outline btn-icon speak-word" data-word="${escapeHtml(w.word)}" title="Озвучить">🔊</button>
+          <button class="btn btn-outline btn-icon delete-word" data-id="${w.id}" title="Удалить">🗑</button>
+        </div>
       </div>
     `).join('');
+    
+    document.querySelectorAll('.speak-word').forEach(btn => {
+      btn.addEventListener('click', function() {
+        speak(this.dataset.word, SPEECH_LANGS[currentLang]);
+      });
+    });
     
     document.querySelectorAll('.delete-word').forEach(btn => {
       btn.addEventListener('click', async function() {
@@ -460,11 +519,12 @@
     });
   }
 
-  // ===== ОТРИСОВКА КАРТОЧЕК =====
+  // ===== КАРТОЧКИ =====
   function renderFlashcards() {
     if (!flashcardQueue.length) {
       fcWord.textContent = '🎉 Все слова выучены!';
       fcTranslation.classList.add('hidden');
+      fcSpeak.classList.add('hidden');
       fcCounter.textContent = '0 осталось';
       return;
     }
@@ -476,11 +536,12 @@
       fcWord.textContent = word.word;
       fcTranslation.textContent = word.translation;
       fcTranslation.classList.add('hidden');
+      fcSpeak.classList.remove('hidden');
       fcCounter.textContent = `${flashcardQueue.length} осталось`;
     }
   }
 
-  // ===== ОТРИСОВКА ВЫУЧЕННЫХ =====
+  // ===== ВЫУЧЕННЫЕ =====
   function renderLearned() {
     const count = learned.length;
     learnedCount.textContent = count;
@@ -490,10 +551,19 @@
     }
     learnedList.innerHTML = learned.map(w => `
       <div class="word-item">
-        <span><strong>${w.word}</strong> — ${w.translation}</span>
-        <button class="btn btn-outline btn-sm unlearn-word" data-id="${w.id}">↩️ вернуть</button>
+        <span class="word-text"><strong>${escapeHtml(w.word)}</strong> — ${escapeHtml(w.translation)}</span>
+        <div class="word-actions">
+          <button class="btn btn-outline btn-icon speak-word" data-word="${escapeHtml(w.word)}" title="Озвучить">🔊</button>
+          <button class="btn btn-outline btn-sm unlearn-word" data-id="${w.id}">↩️ вернуть</button>
+        </div>
       </div>
     `).join('');
+    
+    document.querySelectorAll('.speak-word').forEach(btn => {
+      btn.addEventListener('click', function() {
+        speak(this.dataset.word, SPEECH_LANGS[currentLang]);
+      });
+    });
     
     document.querySelectorAll('.unlearn-word').forEach(btn => {
       btn.addEventListener('click', async function() {
@@ -506,7 +576,7 @@
     });
   }
 
-  // ===== ОТРИСОВКА ФРАЗ =====
+  // ===== ФРАЗЫ =====
   function renderPhrases() {
     if (!phrases.length) {
       phraseList.innerHTML = '<div class="text-muted text-center">Нет фраз. Добавьте!</div>';
@@ -514,10 +584,19 @@
     }
     phraseList.innerHTML = phrases.map(p => `
       <div class="word-item">
-        <span><strong>${p.phrase}</strong> — ${p.translation}</span>
-        <button class="btn btn-outline btn-sm delete-phrase" data-id="${p.id}">🗑</button>
+        <span class="word-text"><strong>${escapeHtml(p.phrase)}</strong> — ${escapeHtml(p.translation)}</span>
+        <div class="word-actions">
+          <button class="btn btn-outline btn-icon speak-word" data-word="${escapeHtml(p.phrase)}" title="Озвучить">🔊</button>
+          <button class="btn btn-outline btn-icon delete-phrase" data-id="${p.id}" title="Удалить">🗑</button>
+        </div>
       </div>
     `).join('');
+    
+    document.querySelectorAll('.speak-word').forEach(btn => {
+      btn.addEventListener('click', function() {
+        speak(this.dataset.word, SPEECH_LANGS[currentLang]);
+      });
+    });
     
     document.querySelectorAll('.delete-phrase').forEach(btn => {
       btn.addEventListener('click', async function() {
@@ -574,7 +653,14 @@
     await loadData();
   });
 
-  // ===== КАРТОЧКИ =====
+  // ===== ОЗВУЧКА КАРТОЧКИ =====
+  fcSpeak.addEventListener('click', function() {
+    const word = flashcardQueue[currentCardIndex];
+    if (!word) return;
+    speak(word.word, SPEECH_LANGS[currentLang]);
+  });
+
+  // ===== КНОПКИ КАРТОЧЕК =====
   fcRemember.addEventListener('click', function() {
     const word = flashcardQueue[currentCardIndex];
     if (!word) return;
@@ -607,7 +693,6 @@
     if (!word) return;
     fcTranslation.classList.remove('hidden');
     setTimeout(async () => {
-      // Проверяем, нет ли уже этого слова в learned
       const { data: existing } = await supabase
         .from('learned')
         .select('id')
@@ -624,8 +709,6 @@
         });
         if (error) { alert('Ошибка: ' + error.message); return; }
       }
-      
-      // Перезагружаем данные — слово исчезнет из словаря и карточек
       await loadData();
     }, 2000);
   });
@@ -698,6 +781,36 @@
       await loadData();
     }
   })();
+
+  // ===== PWA: УСТАНОВКА =====
+  let deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.style.display = 'block';
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log('PWA install:', outcome);
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
+  });
+
+  window.addEventListener('appinstalled', () => {
+    installBtn.style.display = 'none';
+    console.log('PWA установлено');
+  });
+
+  // ===== PWA: SERVICE WORKER =====
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => console.log('SW error:', err));
+    });
+  }
 
 })();
 </script>
